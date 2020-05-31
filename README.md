@@ -1,8 +1,10 @@
 # HCA Decoder
 
-All credits go to the [original authors](https://github.com/KinoMyu/FastHCADecoder) of this repo. I can't believe this efficient, lightweight command line tool remains in obscurity because of language barriers, so I decided to translate the error messages in the source files and add some useful resources like uncovered HCA keys for popular games.
+All credits go to the [original authors](https://github.com/KinoMyu/FastHCADecoder) of the code.
 
-# Usage
+This efficient, lightweight command line tool has remained in obscurity because of language barriers. To promote this tool, I translated the error messages and command line outputs, and added some useful resources like uncovered HCA keys for popular games.
+
+# Build Info and Usage
 
 ```
 make
