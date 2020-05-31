@@ -137,7 +137,7 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
     // HCAファイルを開く
     FILE *fp = fopen(filenameHCA, "rb");
     if (!fp) {
-        printf("Error: ファイルが開けませんでした。\n");
+        printf("Error: Failed to open file. Please check if file exists.\n");
         return false;
     }
 
@@ -146,7 +146,7 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
     memset(&header, 0, sizeof(header));
     fread(&header, sizeof(header), 1, fp);
     if (!CheckFile(&header, sizeof(header))) {
-        printf("Error: HCAファイルではありません。\n");
+        printf("Error: This isn't an HCA file.\n");
         fclose(fp); return false;
     }
 
@@ -154,7 +154,7 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
     header.dataOffset = bswap(header.dataOffset);
     unsigned char *data = new unsigned char[header.dataOffset];
     if (!data) {
-        printf("Error: メモリ不足です。\n");
+        printf("Error: Not enough memory.\n");
         fclose(fp); return false;
     }
     fseek(fp, 0, SEEK_SET);
@@ -165,7 +165,7 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
 
     // サイズチェック
     if (size<sizeof(stHeader)) {
-        printf("Error: ヘッダのサイズが小さすぎます。\n");
+        printf("Error: The data size is smaller than what the header specifies.\n");
         delete[] data; fclose(fp); return false;
     }
 
@@ -174,13 +174,16 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
         stHeader *hca = (stHeader *)s; s += sizeof(stHeader);
         _version = bswap(hca->version);
         _dataOffset = bswap(hca->dataOffset);
-        printf("コーデック: HCA\n");
-        printf("バージョン: %d.%d\n", _version >> 8, _version & 0xFF);
+        printf("Codec: HCA\n");
+        printf("version: %d.%d\n", _version >> 8, _version & 0xFF);
         //if(size<_dataOffset)return false;
-        if (CheckSum(hca, _dataOffset))printf("※ ヘッダが破損しています。改変してる場合もこの警告が出ます。\n");
+        if (CheckSum(hca, _dataOffset)) {
+            printf("※ The data is corrputed and the checksum doesn't match."
+            " This warning may show up if you have modified the file.\n");
+        }
     }
     else {
-        printf("※ HCAチャンクがありません。再生に必要な情報です。\n");
+        printf("※ There is no HCA chunk containing information required for playback.\n");
     }
 
     // fmt
@@ -192,23 +195,23 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
         _muteHeader = bswap(fmt->muteHeader);
         _muteFooter = bswap(fmt->muteFooter);
         switch (_channelCount) {
-        case 1:printf("チャンネル数: モノラル (1チャンネル)\n"); break;
-        case 2:printf("チャンネル数: ステレオ (2チャンネル)\n"); break;
-        default:printf("チャンネル数: %dチャンネル\n", _channelCount); break;
+        case 1:printf("Channel count: monaural (1 channel)\n"); break;
+        case 2:printf("Channel count: stereo (2 channels)\n"); break;
+        default:printf("Channel count: %d channel(s)\n", _channelCount); break;
         }
         if (!(_channelCount >= 1 && _channelCount <= 16)) {
-            printf("※ チャンネル数の範囲は1～16です。\n");
+            printf("※ Channel count isn't within 1 and 16.\n");
         }
-        printf("サンプリングレート: %dHz\n", _samplingRate);
+        printf("Sampling rate: %dHz\n", _samplingRate);
         if (!(_samplingRate >= 1 && _samplingRate <= 0x7FFFFF)) {
-            printf("※ サンプリングレートの範囲は1～8388607(0x7FFFFF)です。\n");
+            printf("※ Sampling rate isn't within 1 and 8388607(0x7FFFFF)\n");
         }
-        printf("ブロック数: %d\n", _blockCount);
-        printf("先頭無音ブロック数: %d\n", (_muteHeader - 0x80) / 0x400);
-        printf("末尾無音サンプル数: %d\n", _muteFooter);
+        printf("Block count: %d\n", _blockCount);
+        printf("Mute header sample count: %d\n", (_muteHeader - 0x80) / 0x400);
+        printf("Mute footer sample count: %d\n", _muteFooter);
     }
     else {
-        printf("※ fmtチャンクがありません。再生に必要な情報です。\n");
+        printf("※ There is no HCA chunk containing information required for playback.\n");
     }
 
     // comp
@@ -224,20 +227,20 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
         _comp_r07 = comp->r07;
         _comp_r08 = comp->r08;
         unsigned int bps = _samplingRate * _blockSize / 128;
-        if (bps<1000000)printf("ビットレート: %gkbps CBR (固定ビットレート)\n", bps / 1000.0f);
-        else printf("ビットレート: %gMbps CBR (固定ビットレート)\n", bps / 1000000.0f);
-        printf("ブロックサイズ: 0x%X\n", _blockSize);
+        if (bps<1000000)printf("Bit rate: %gkbps CBR (default bit rate)\n", bps / 1000.0f);
+        else printf("Bit rate: %gMbps CBR (default bit rate)\n", bps / 1000000.0f);
+        printf("Block size: 0x%X\n", _blockSize);
         if (!(_blockSize >= 8 && _blockSize <= 0xFFFF)) {
-            printf("※ ブロックサイズの範囲は8～65535(0xFFFF)です。v1.3では0でVBRになるようになってましたが、v2.0から廃止されたようです。\n");
+            printf("※ Block size isn't within 1 and 65535(0xFFFF). In v1.3 the VBR is 0 but v2.0 has abolished this.\n");
         }
         printf("comp1: %d\n", _comp_r01);
         printf("comp2: %d\n", _comp_r02);
         if (!(/*_comp_r01 >= 0 &&*/ _comp_r01 <= _comp_r02 && _comp_r02 <= 0x1F)) {
-            printf("※ comp1とcomp2の範囲は0<=comp1<=comp2<=31です。v2.0現在、comp1は1、comp2は15で固定されています。\n");
+            printf("※ comp1 and comp2 should satisfy 0<=comp1<=comp2<=31. Currently v2.0 has fixed comp1 at 1 and comp2 at 15.\n");
         }
         printf("comp3: %d\n", _comp_r03);
         if (!_comp_r03) {
-            printf("※ comp3は1以上の値です。\n");
+            printf("※ comp3 is greater than 1.\n");
         }
         printf("comp4: %d\n", _comp_r04);
         printf("comp5: %d\n", _comp_r05);
@@ -259,20 +262,20 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
         _comp_r07 = _comp_r05 - _comp_r06;
         _comp_r08 = 0;
         unsigned int bps = _samplingRate * _blockSize / 128;
-        if (bps<1000000)printf("ビットレート: %gkbps CBR (固定ビットレート)\n", bps / 1000.0f);
-        else printf("ビットレート: %gMbps CBR (固定ビットレート)\n", bps / 1000000.0f);
-        printf("ブロックサイズ: 0x%X\n", _blockSize);
+        if (bps<1000000)printf("Bit rate: %gkbps CBR (default bit rate)\n", bps / 1000.0f);
+        else printf("Bit rate: %gMbps CBR (default bit rate)\n", bps / 1000000.0f);
+        printf("Block size: 0x%X\n", _blockSize);
         if (!(_blockSize >= 8 && _blockSize <= 0xFFFF)) {
-            printf("※ ブロックサイズの範囲は8～65535(0xFFFF)です。v1.3では0でVBRになるようになってましたが、v2.0から廃止されたようです。\n");
+            printf("※ Block size isn't within 1 and 65535(0xFFFF). In v1.3 the VBR is 0 but v2.0 has abolished this.\n");
         }
         printf("dec1: %d\n", _comp_r01);
         printf("dec2: %d\n", _comp_r02);
         if (!(/*_comp_r01 >= 0 &&*/ _comp_r01 <= _comp_r02 && _comp_r02 <= 0x1F)) {
-            printf("※ dec1とdec2の範囲は0<=dec1<=dec2<=31です。v2.0現在、dec1は1、dec2は15で固定されています。\n");
+            printf("※ dec1 and dec2 should satisfy 0<=dec1<=dec2<=31. Currently v2.0 has fixed dec1 at 1 and dec2 at 15.\n");
         }
         printf("dec3: %d\n", _comp_r03);
         if (!_comp_r03) {
-            printf("※ dec3は再生時に1以上の値に修正されます。\n");
+            printf("※ dec3 is greater than 1 and will be corrected during playback.\n");
         }
         printf("dec4: %d\n", _comp_r04);
         printf("dec5: %d\n", _comp_r05);
@@ -280,7 +283,7 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
         printf("dec7: %d\n", _comp_r07);
     }
     else {
-        printf("※ compチャンクまたはdecチャンクがありません。再生に必要な情報です。\n");
+        printf("※ There is no comp chunk or dec chunk containing information required for playback.\n");
     }
 
     // vbr
@@ -288,13 +291,13 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
         stVBR *vbr = (stVBR *)s; s += sizeof(stVBR);
         _vbr_r01 = bswap(vbr->r01);
         _vbr_r02 = bswap(vbr->r02);
-        printf("ビットレート: VBR (可変ビットレート) ※v2.0で廃止されています。\n");
+        printf("Bit rate: VBR (changeable bit rate) ※Abolished since v2.0\n");
         if (!(_blockSize == 0)) {
-            printf("※ compまたはdecチャンクですでにCBRが指定されています。\n");
+            printf("※ CBR already specified in comp or dec chunk\n");
         }
         printf("vbr1: %d\n", _vbr_r01);
         if (!(/*_vbr_r01 >= 0 &&*/ _vbr_r01 <= 0x1FF)) {
-            printf("※ vbr1の範囲は0～511(0x1FF)です。\n");
+            printf("※ vbr1 isn't within 0 and 511(0x1FF).\n");
         }
         printf("vbr2: %d\n", _vbr_r02);
     }
@@ -307,11 +310,11 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
     if ((*(unsigned int *)s & 0x7F7F7F7F) == 0x00687461) {
         stATH *ath = (stATH *)s; s += 6;//s+=sizeof(stATH);
         _ath_type = ath->type;
-        printf("ATHタイプ:%d ※v2.0から廃止されています。\n", _ath_type);
+        printf("ATH type:%d ※Abolished since v2.0\n", _ath_type);
     }
     else {
         if (_version<0x200) {
-            printf("ATHタイプ:1 ※v2.0から廃止されています。\n");
+            printf("ATH type:1 ※Abolished since v2.0\n");
         }
     }
 
@@ -322,18 +325,18 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
         _loopEnd = bswap(loop->end);
         _loopCount = bswap(loop->count);
         _loop_r01 = bswap(loop->r01);
-        printf("ループ開始ブロック: %d\n", _loopStart);
-        printf("ループ終了ブロック: %d\n", _loopEnd);
+        printf("Loop start: %d\n", _loopStart);
+        printf("Loop end: %d\n", _loopEnd);
         if (!(/*_loopStart >= 0 &&*/ _loopStart <= _loopEnd && _loopEnd<_blockCount)) {
-            printf("※ ループ開始ブロックとループ終了ブロックの範囲は、0<=ループ開始ブロック<=ループ終了ブロック<ブロック数 です。\n");
+            printf("※ Loop start and end should satisfy 0 <= loop start <= loop end < block count.\n");
         }
         if (_loopCount == 0x80) {
-            printf("ループ回数: 無限ループ\n");
+            printf("Loop count: Inifite loop.\n");
         }
         else {
-            printf("ループ回数: %d回\n", _loopCount);
+            printf("Loop count: %dloop(s)\n", _loopCount);
         }
-        printf("ループ情報1: %d\n", _loop_r01);
+        printf("Loop info 1: %d\n", _loop_r01);
     }
 
     // ciph
@@ -341,13 +344,13 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
         stCipher *ciph = (stCipher *)s; s += 6;//s+=sizeof(stCipher);
         _ciph_type = bswap(ciph->type);
         switch (_ciph_type) {
-        case 0:printf("暗号化タイプ: なし\n"); break;
-        case 1:printf("暗号化タイプ: 鍵無し暗号化\n"); break;
-        case 0x38:printf("暗号化タイプ: 鍵有り暗号化 ※正しい鍵を使わないと出力波形がおかしくなります。\n"); break;
-        default:printf("暗号化タイプ: %d\n", _ciph_type); break;
+        case 0:printf("Cipher type: None\n"); break;
+        case 1:printf("Cipher type: Keyless cipher\n"); break;
+        case 0x38:printf("Cipher type: Key cipher ※If you do not use the correct key, the output waveform will be incorrect.\n"); break;
+        default:printf("Cipher type: %d\n", _ciph_type); break;
         }
         if (!(_ciph_type == 0 || _ciph_type == 1 || _ciph_type == 0x38)) {
-            printf("※ この暗号化タイプは、v2.0現在再生できません。\n");
+            printf("※ This cipher type cannot be played as of v2.0.\n");
         }
     }
 
@@ -355,7 +358,7 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
     if ((*(unsigned int *)s & 0x7F7F7F7F) == 0x00617672) {
         stRVA *rva = (stRVA *)s; s += sizeof(stRVA);
         _rva_volume = bswap(rva->volume);
-        printf("相対ボリューム調節: %g倍\n", _rva_volume);
+        printf("Relative volume: %gx\n", _rva_volume);
     }
 
     // comm
@@ -363,7 +366,7 @@ bool clHCA::PrintInfo(const char *filenameHCA) {
         stComment *comm = (stComment *)s; s += 5;//s+=sizeof(stComment);
         _comm_len = comm->len;
         _comm_comment = (char *)s;
-        printf("コメント: %s\n", _comm_comment);
+        printf("comment: %s\n", _comm_comment);
     }
 
     delete[] data;

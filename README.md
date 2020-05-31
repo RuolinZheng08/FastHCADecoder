@@ -1,93 +1,103 @@
-# HCAデコーダ
+# HCA Decoder
 
-This program is strictly for decoding to WAV quickly. If you need a HCA streaming library, consider using [libcgss](https://github.com/hozuki/libcgss).
+All credits go to the [original authors](https://github.com/KinoMyu/FastHCADecoder) of this repo. I can't believe this efficient, lightweight command line tool remains in obscurity because of language barriers, so I decided to translate the error messages in the source files and add some useful resources like uncovered HCA keys for popular games.
 
-![Screenshot](https://i.imgur.com/5zfgAch.png)
+# Usage
 
-Comparison between single and multi threaded modes of FastHCADecoder and the [hca decoder in C](https://github.com/Ishotihadus/hca). Tests were performed on Windows with an R9 3900X. Your mileage may vary with different hardware/OS configurations and compilers.
+```
+make
+```
 
-Sample file can be found here: https://kinomyu.github.io/bgm.hca
+```
+usage: ./clHCA [options] input.hca
 
-# Changes to original
- - Multithreaded CRI HCA decoding (much higher performance)
- - Fixed WAV data chunk size
- - Fixed WAV smpl chunk loop points
- - Fixed looping
- - Added support for newer hca files that require a subkey
+options:
+  -o      output filename
+  -a      set key (lower 8 hex digits)
+  -b      set key (higher 8 hex digits)
+  -s      set sub key (4 hex digits, in decimal)
+  -c      try decrypting the file without generating an output
+  -m      mode
+  -l      loop
+  -v      volume
+  -t      number of threads (to speed up decoding)
+  -i      show info about input file and quit
+  -h      show this help message
+```
 
-# HCAファイルのデコード方法
+This repo contains a sample file `sample.hca` and uses its key `00A06A0B 8D0C10FD` as a built-in. Note that you have to change the key for your HCA files to decode properly. You can find a list of uncovered HCA keys for popular games here:
+- https://github.com/losnoco/vgmstream/blob/master/src/meta/hca_keys.h
+- https://hcs64.com/mboard/forum.php?showthread=22828
 
-  HCAファイルをhca.exeにドラッグ＆ドロップすると、同じファイル名のWAVEファイルができます。
-  複数ファイルのデコードにも対応してます。
-  デコードオプションはデフォルト値のままです。
+Note that the lower digits `8D0C10FD` go with `-a` and the higher ones `00A06A0B` go with `-b`.
 
-  デコードオプションを指定したいときは
-  オプション指定デコード.batにドラッグ＆ドロップしてください。
-  こちらも複数ファイルのデコードに対応してます。
+## Decode
 
+```
+./clHCA sample.hca -a 8D0C10FD -b 00A06A0B
+```
 
-# HCAファイルの復号化方法
+`sample.hca` will decode to `sample.wav`. You should hear footsteps if you play it. If you hear noise instead, please submit a GitHub issue.
 
-  HCAファイルを復号化.batにドラッグ＆ドロップすると、HCAファイル自体が復号化されます。
-  上書きされるので注意してください。
-  複数ファイルの復号化にも対応してます。
+## Decrypt (no output)
 
+```
+./clHCA sample.hca -a 8D0C10FD -b 00A06A0B -c
 
-# 仕様
+Decrypting sample.hca...
+Decrypted successfully with the keys provided.
+```
 
-  デフォルトのデコードオプションは
-    音量 = 1(倍)
-    ビットモード = 16(ビット)
-    ループ回数 = 0(回)
-    復号鍵 = 0002B875BC731A85 ※ミリシタで使われている鍵
-  です。
+## HCA file Info
 
-  HCAファイルにループ情報が入っていた場合、WAVEファイルにsmplチャンクを追加してます。
-  ただし、デコードオプションのループ回数が1回以上のときは、smplチャンクを追加せず、直接波形データとして出力します。
-  このとき出力される波形データは以下のようになります。
-  ※HCAファイルにループ情報が入っていない場合、ループ開始位置とループ終了位置をそれぞれ先頭位置と末尾位置として扱います。
-  [先頭位置～ループ終了位置]＋[ループ開始位置～ループ終了位置]×(ループ回数－１)＋[ループ開始位置～末尾位置]
+The ouput below shows that our sample file uses enrcyption keys.
 
-  HCAファイルにコメント情報が入っていた場合、WAVEファイルにnoteチャンクを追加してます。
+```
+./clHCA sample.hca -i
 
+Showing info for sample.hca:
+Codec: HCA
+version: 2.0
+Channel count: stereo (2 channels)
+Sampling rate: 48000Hz
+Block count: 393
+Mute header sample count: 0
+Mute footer sample count: 943
+Bit rate: 192kbps CBR (default bit rate)
+Block size: 0x200
+comp1: 1
+comp2: 15
+comp3: 1
+comp4: 0
+comp5: 128
+comp6: 64
+comp7: 64
+comp8: 0
+Cipher type: Key cipher ※If you do not use the correct key, the output waveform will be incorrect.
 
-# 注意事項
+```
 
-  一応バージョンチェックを外してますが
-  今後、v2.1以降のHCAが出てきたとき、デコードに失敗する可能性があります。
+Another sample file can be found at: https://kinomyu.github.io/bgm.hca. Note that there is no encrytion key.
+```
+./clHCA bgm.hca -i
 
-  HCAヘッダの破損チェックも無効にしています。
-  これはヘッダを改変しやすくするためです。
-  もし本当に破損していてもエラーになりません。
-
-  暗号テーブルで使用する鍵はゲーム別に異なります。※開発会社によっては同じ鍵を使うことをがあります。
-  暗号テーブルの種類が0x38のとき、鍵が異なるとうまくデコードされません。
-
-  復号鍵を指定してデコードするときは
-  オプション指定デコード.batをテキストエディタで開いて、デフォルト値設定の復号鍵を変更しておくと楽です。
-
-  CBRのみ対応。VBRはデコードに失敗します。※VBRは存在しない可能性あり。
-
-  コマンドプロンプトの仕様で、&を含むファイルパス(ファイル名やフォルダ名)は
-  オプション指定デコード.batや、復号化.batなどのバッチファイルにドラッグ＆ドロップすると
-  ファイルが開けず、エラーが出ます。
-
-
-# 免責事項
-
-  このアプリケーションを利用した事によるいかなる損害も作者は一切の責任を負いません。
-  自己の責任の上で使用して下さい。
-
-
-# その他
-
-  HCAv2.0からヘッダのVBRチェックをやってない痕跡があるので
-  最初からCBRのみしか存在しないのかもしれない。
-
-  ATHテーブルもType0しか存在しなかった痕跡あり。
-
-  普通にデコードすると16ビットPCMになるので音質が劣化するよ！
-  オプション指定デコードで、ビットモードをfloatにすると劣化しないよ！
-  でもHCA自体が非可逆圧縮なので元々劣化してるよ！
-  どっちだよ！
-
+Showing info for bgm.hca:
+Codec: HCA
+version: 2.0
+Channel count: stereo (2 channels)
+Sampling rate: 44100Hz
+Block count: 5563
+Mute header sample count: 0
+Mute footer sample count: 164
+Bit rate: 234.97kbps CBR (default bit rate)
+Block size: 0x2AA
+comp1: 1
+comp2: 15
+comp3: 1
+comp4: 0
+comp5: 128
+comp6: 128
+comp7: 0
+comp8: 0
+Cipher type: None
+```
